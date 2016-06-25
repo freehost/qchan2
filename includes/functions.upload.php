@@ -482,7 +482,12 @@ function duplicate_hash($name, $path, $thumb) {
 }
 // Generate upload log
 function uploadlog($name, $type) {
-	if (!isset($_SESSION['visit']) || preg_match('/^[a-z]{10}\.(jpg)|(png)$/i', $name)) {
+	@session_start();
+	if (!isset($_SESSION['visit'])) {
+		header('HTTP/1.1 403 Forbidden');
+		exit('Internal Server Error');
+	}
+	if (preg_match('/^[a-z]{10}\.(png|jpg)$/i', $name)) {
 		header('HTTP/1.1 403 Forbidden');
 		exit('API cannot be direct accessed!');
 	}
