@@ -21,20 +21,21 @@ function setup_dir() {
 	if(!file_exists(ABSPATH.'/'.THUMB_DIR . '/' . $year .'/'. $month))
 		mkdir(ABSPATH.'/'.THUMB_DIR . '/' . $year .'/'. $month);
 	$thumbs_dir=THUMB_DIR . '/' . $year .'/'. $month;
-	
+
 	return array($uploads_dir,$thumbs_dir);
 }
 
 //Handle the URL uploading
 function url_handler() {
 	list($uploads_dir,$thumbs_dir) = setup_dir();
-	
+
 	$url = $_POST['url'];
 	$name = escape_special_char(basename($url));
-	
+	uploadlog($name, 'url');
+
 	$result = array('qid'=>$_POST['qid']);
 	$host = get_cdn();
-	
+
 	$purl=parse_url($url);
 	if($purl['host']==$_SERVER['SERVER_NAME'] || CDN_ENABLED && in_array($purl['host'], explode(',', CDN_LIST))) {
 		$result['status']='success';
@@ -43,7 +44,7 @@ function url_handler() {
 		$result['thumb']=$url;
 		return $result;
 	}
-	
+
 	if(remote_filesize($url) > get_size_limit()) {
 		$result['status'] = 'failed';
 		$result['err'] = 'size_limit';
@@ -70,7 +71,7 @@ function url_handler() {
 		}else {
 			$mime=file_mime_type($temp);
 			switch($mime) {
-				case 'image/jpeg':	
+				case 'image/jpeg':
 					if(!preg_match('/\.(jpg|jpeg|jpe|jfif|jfi|jif)$/i', $name)) {
 						$name.='.jpg';
 					}
@@ -138,6 +139,8 @@ function file_handler() {
 	foreach($files['error'] as $key => $error) {
 		$result = isset($_POST['qid']) ? array('qid'=>$_POST['qid']) : array();
 		$name =  escape_special_char($files['name'][$key]);
+		uploadlog($name, 'file');
+
 		$host = get_cdn();
 
 		if($error==UPLOAD_ERR_OK) {
@@ -158,7 +161,7 @@ function file_handler() {
 				}else {
 					$mime=file_mime_type($temp);
 					switch($mime) {
-						case 'image/jpeg':	
+						case 'image/jpeg':
 							if(!preg_match('/\.(jpg|jpeg|jpe|jfif|jfi|jif)$/i', $name)) {
 								$name.='.jpg';
 							}
@@ -182,7 +185,7 @@ function file_handler() {
 							$result['status'] = 'failed';
 							$result['err'] = 'wrong_type';
 					}
-					
+
 					if(!isset($result['status']) || !$result['status'] == 'failed') {
 						$name = rename_if_exists($name, $uploads_dir);
 						$path = "$uploads_dir/$name";
@@ -256,8 +259,8 @@ function rename_if_exists($name, $dir) {
 }
 
 //Get remote file size
-function remote_filesize($url){  
-	$url = parse_url($url); 
+function remote_filesize($url){
+	$url = parse_url($url);
 	if($fp = @fsockopen($url['host'],empty($url['port'])?80:$url['port'],$error)){
 		fputs($fp,"GET ".(empty($url['path'])?'/':$url['path'])." HTTP/1.1\r\n");
 		fputs($fp,"Host:$url[host]\r\n\r\n");
@@ -312,7 +315,7 @@ function make_thumb($name, $path, $thumbs_dir) {
 		if(preg_match('/<svg.*?width="([\d.]+)(em|ex|px|in|cm|mm|pt|pc|%)?".*?height="([\d.]+)(em|ex|px|in|cm|mm|pt|pc|%)?".*?>/', $svg, $match)){
 			$width = $match[1];
 			$height = $match [3];
-			
+
 		}else if(preg_match('/<svg.*?height="([\d.]+)(em|ex|px|in|cm|mm|pt|pc|%)?".*?width="([\d.]+)(em|ex|px|in|cm|mm|pt|pc|%)?".*?>/', $svg, $match)) {
 			$width = $match[3];
 			$height = $match [1];
@@ -336,7 +339,7 @@ function make_thumb($name, $path, $thumbs_dir) {
 	}
 	$notype = false;
 	list($width_orig, $height_orig, $type) = $imgInfo;
-	
+
 	switch($type){
 		case IMAGETYPE_GIF:
 			$readf="imagecreatefromgif";
@@ -373,7 +376,7 @@ function make_thumb($name, $path, $thumbs_dir) {
 			return $return;
 		}
 		$image = $readf(ABSPATH.'/'.$path);
-		
+
 		// Create alpha channel for png
 		if($type == IMAGETYPE_PNG) {
 			if(!imagealphablending($image_p, false) || !imagesavealpha($image_p,true) || !($transparent = imagecolorallocatealpha($image_p, 255, 255, 255, 127)) || !imagefill($image_p, 0, 0, $transparent)) {
@@ -396,7 +399,7 @@ function make_thumb($name, $path, $thumbs_dir) {
 		if(!imagecopyresampled($image_p, $image, 0, 0, 0, 0, $width, $height, $width_orig, $height_orig)) {
 			return $return;
 		}
-		
+
 		if(!$writef($image_p, ABSPATH."/$thumbs_dir/$name")) {
 			return $return;
 		}
@@ -407,7 +410,7 @@ function make_thumb($name, $path, $thumbs_dir) {
 	}
 	$return['exlong'] = $exlong?'long':'';
 	$return['extiny'] = $extiny?'tiny':'';
-	
+
 	return $return;
 }
 
@@ -422,10 +425,10 @@ function watermark($file) {
 			$readf="imagecreatefrompng";
 			$writef="imagepng";
 		}
-		
+
 		list($x, $y) = explode(',', WATERMARK_POS);
 		list($min_width, $min_height) = explode('x', WATERMARK_MIN_SIZE);
-		
+
 		if($width >= $min_width && $height >= $min_height) {
 			if($x < 0) $x = $width + $x;
 			if($y < 0) $y = $height + $y;
@@ -476,4 +479,13 @@ function duplicate_hash($name, $path, $thumb) {
 	}else {
 		return true;
 	}
+}
+// Generate upload log
+function uploadlog($name, $type) {
+	$ip = isset($_SERVER['HTTP_CF_CONNECTING_IP']) ? $_SERVER['HTTP_CF_CONNECTING_IP'] :
+		(isset($_SERVER['HTTP_X_REAL_IP']) ? $_SERVER['HTTP_X_REAL_IP'] :
+		(isset($_SERVER['HTTP_INCAP_CLIENT_IP']) ? $_SERVER['HTTP_INCAP_CLIENT_IP'] :
+		(isset($_SERVER['HTTP_X_FORWARDED_FOR']) ? $_SERVER['HTTP_X_FORWARDED_FOR'] :
+		$_SERVER['REMOTE_ADDR'])));
+	file_put_contents(ABSPATH.'/'.UPLOAD_DIR . '/upload.log', date('[Y-m-d H:i:s] ').$ip.'    '.$type.':'.$name.PHP_EOL, FILE_APPEND);
 }
