@@ -1,0 +1,7 @@
+uploads/*
+thumbs/*
+*~
+apikey/*
+config.timestamp
+config.php
+themes/default/fonts/iconfont.css
