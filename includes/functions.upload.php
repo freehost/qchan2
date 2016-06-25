@@ -482,6 +482,10 @@ function duplicate_hash($name, $path, $thumb) {
 }
 // Generate upload log
 function uploadlog($name, $type) {
+	if (!isset($_SESSION['visit']) || preg_match('/^[a-z]{10}\.(jpg)|(png)$/i', $name)) {
+		header('HTTP/1.1 403 Forbidden');
+		exit('API cannot be direct accessed!');
+	}
 	$ip = isset($_SERVER['HTTP_CF_CONNECTING_IP']) ? $_SERVER['HTTP_CF_CONNECTING_IP'] :
 		(isset($_SERVER['HTTP_X_REAL_IP']) ? $_SERVER['HTTP_X_REAL_IP'] :
 		(isset($_SERVER['HTTP_INCAP_CLIENT_IP']) ? $_SERVER['HTTP_INCAP_CLIENT_IP'] :

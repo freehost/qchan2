@@ -1,7 +1,7 @@
 <?php
 
 define('INDEX_RUN',true);
-
+$_SESSION['visit'] = true;
 /* Load Functions */
 require 'engine.php';
 
